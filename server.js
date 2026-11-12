@@ -1,6 +1,7 @@
 const express = require("express");
 const knex = require("knex");
 const app = express();
+app.use(express.json());
 const port = 8080;
 
 const database = knex({
@@ -45,20 +46,38 @@ app.get("/api/bookings/by-search/:search_word", async (req, res) => {
   return res.status(200).json(data);
 });
 
-app.put("/api/booking", (req, res) => {
-  const { body } = req.body;
+app.put("/api/booking", async (req, res) => {
+  try {
+    const { customer_email, hotel_id, start_date, end_date } = req.body;
 
-  const data = database("bookings")
-    .where({
-      customer_email: body.customer_email,
-      hotel_id: body.hotel_id,
-    })
-    .update(body);
+    const isData = await database("bookings").where({
+      customer_email,
+      hotel_id,
+    });
 
-  if (data) {
-    return res.status(200).json({ response: "siker??" });
-  } else {
-    return res.status(500).json({ response: "error " });
+    if (isData.length > 0) {
+      console.log("-->");
+      const data = await database("bookings")
+        .insert({
+          customer_email,
+          hotel_id,
+          start_date,
+          end_date,
+        })
+        .onConflict(["customer_email", "hotel_id"])
+        .merge({
+          start_date,
+          end_date,
+        });
+      console.log("-->", data);
+
+      return res.status(200).json({ response: "succes", data });
+    } else {
+      return res.status(400).json({ error: "no user" });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ response: "error" });
   }
 });
 
